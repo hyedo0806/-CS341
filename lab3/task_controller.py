@@ -50,85 +50,32 @@ import pox.openflow.libopenflow_01 as of
 # If you want, you can define global variables, import libraries, or do others
 ###
 
+hosts = {}
+switches = {}
 
 def init(net) -> None:
-    # Compute forwarding rules for all switches
-    # This function is called only once during network initialization
-
+    global hosts, switches
+    hosts = net['hosts']
     switches = net['switches']
-    links = []
+    print("for task3 init", net)
 
-    # Parse links from the network structure
-    for switch_name, switch_info in switches.items():
-        for link_info in switch_info['links']:
-            links.append(link_info)
 
-    # Compute forwarding rules using Dijkstra algorithm
-    forwarding_rules = {}  # Dictionary to store forwarding rules for each switch
-
-    # Define a function to calculate the shortest path using Dijkstra's algorithm
-    def dijkstra(switch_name):
-        # Initialize data structures
-        visited = set()
-        distance = {}
-        previous = {}
-        for switch in switches:
-            distance[switch] = float('inf')
-            previous[switch] = None
-
-        distance[switch_name] = 0
-
-        # Calculate shortest path
-        while len(visited) < len(switches):
-            # Select the switch with the shortest distance
-            current_switch = min((s for s in switches if s not in visited), key=lambda x: distance[x])
-            visited.add(current_switch)
-
-            # Update distances to neighbors
-            for link_info in links:
-                if link_info[0] == current_switch:
-                    neighbor = link_info[2]
-                    cost = link_info[4]
-                    if distance[current_switch] + cost < distance[neighbor]:
-                        distance[neighbor] = distance[current_switch] + cost
-                        previous[neighbor] = current_switch
-
-        # Extract forwarding rules
-        rules = {}
-        for destination, next_hop in previous.items():
-            if next_hop is not None:
-                out_port = next(link_info[3] for link_info in links if link_info[0] == destination and link_info[2] == next_hop)
-                rules[destination] = out_port
-
-        return rules
-
-    for switch_name in switches:
-        rules = dijkstra(switch_name)
-        forwarding_rules[switch_name] = rules
-
-    # Store the forwarding rules for later use
-    net['_forwarding_rules'] = forwarding_rules
+    
 
 def addrule(switchname: str, connection) -> None:
-    # Compute forwarding rules for all switches and push rules to switches
-    forwarding_rules = connection.net['_forwarding_rules']
+    global hosts, switches
 
-    if switchname in forwarding_rules:
-        rules = forwarding_rules[switchname]
-        for destination, out_port in rules.items():
-            # Create flow modification message for ARP packets
-            arp_msg = of.ofp_flow_mod()
-            arp_msg.match.dl_type = 0x0806  # Match ARP packets (EtherType 0x0806)
-            arp_msg.match.nw_dst = destination  # Match the destination IP address
-            arp_msg.actions.append(of.ofp_action_output(port=out_port))  # Set the output port
-            connection.send(arp_msg)  # Send the message to the switch
+    if switchname in switches:
 
-            # Create flow modification message for IPv4 packets
-            ipv4_msg = of.ofp_flow_mod()
-            ipv4_msg.match.dl_type = 0x0800  # Match IPv4 packets (EtherType 0x0800)
-            ipv4_msg.match.nw_dst = destination  # Match the destination IP address
-            ipv4_msg.actions.append(of.ofp_action_output(port=out_port))  # Set the output port
-            connection.send(ipv4_msg)  # Send the message to the switch
+        # 라우팅 규칙을 계산하고 스위치에 추가하는 로직을 구현합니다.
+        # Dijkstra 알고리즘 또는 다른 라우팅 알고리즘을 사용하여 라우팅 규칙을 계산합니다.
+
+        # 예를 들어, 모든 스위치 간에 연결된 포트로 전송하는 규칙을 설정하는 코드입니다.
+        msg = of.ofp_flow_mod()
+        msg.match = of.ofp_match()  # 모든 패킷과 일치
+        msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))  # 모든 포트로 패킷을 전송
+        connection.send(msg)  
+
 
 def handlePacket(switchname, event, connection):
     # This function is not needed for Task 3, so you can leave it empty.
