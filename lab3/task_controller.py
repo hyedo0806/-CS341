@@ -52,15 +52,16 @@ import pox.openflow.libopenflow_01 as of
 
 
 def init(net) -> None:
-    # Parse network structure and compute forwarding rules for all switches
+    # Compute forwarding rules for all switches
     # This function is called only once during network initialization
 
-    # Parse network structure
-    print("for task3 ", net)
     switches = net['switches']
     links = []
-    for switch in switches:
-        links.extend(switch['links'])
+
+    # Parse links from the network structure
+    for switch_name, switch_info in switches.items():
+        for link_info in switch_info['links']:
+            links.append(link_info)
 
     # Compute forwarding rules using Dijkstra algorithm
     forwarding_rules = {}  # Dictionary to store forwarding rules for each switch
@@ -72,36 +73,36 @@ def init(net) -> None:
         distance = {}
         previous = {}
         for switch in switches:
-            distance[switch['name']] = float('inf')
-            previous[switch['name']] = None
+            distance[switch] = float('inf')
+            previous[switch] = None
 
         distance[switch_name] = 0
 
         # Calculate shortest path
         while len(visited) < len(switches):
             # Select the switch with the shortest distance
-            current_switch = min((s for s in switches if s['name'] not in visited), key=lambda x: distance[x['name']])
-            visited.add(current_switch['name'])
+            current_switch = min((s for s in switches if s not in visited), key=lambda x: distance[x])
+            visited.add(current_switch)
 
             # Update distances to neighbors
-            for link in current_switch['links']:
-                neighbor = link[0]
-                cost = link[4]
-                if distance[current_switch['name']] + cost < distance[neighbor]:
-                    distance[neighbor] = distance[current_switch['name']] + cost
-                    previous[neighbor] = current_switch['name']
+            for link_info in links:
+                if link_info[0] == current_switch:
+                    neighbor = link_info[2]
+                    cost = link_info[4]
+                    if distance[current_switch] + cost < distance[neighbor]:
+                        distance[neighbor] = distance[current_switch] + cost
+                        previous[neighbor] = current_switch
 
         # Extract forwarding rules
         rules = {}
         for destination, next_hop in previous.items():
             if next_hop is not None:
-                out_port = next(link[4] for link in switches[destination]['links'] if link[0] == next_hop)
+                out_port = next(link_info[3] for link_info in links if link_info[0] == destination and link_info[2] == next_hop)
                 rules[destination] = out_port
 
         return rules
 
-    for switch in switches:
-        switch_name = switch['name']
+    for switch_name in switches:
         rules = dijkstra(switch_name)
         forwarding_rules[switch_name] = rules
 
