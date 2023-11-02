@@ -56,6 +56,7 @@ def init(net) -> None:
     # This function is called only once during network initialization
 
     # Parse network structure
+    print("for task3 ", net)
     switches = net['switches']
     links = []
     for switch in switches:
