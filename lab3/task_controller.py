@@ -1,7 +1,5 @@
 #!/usr/bin/python3
 
-
-import networkx as nx
 import pox.openflow.libopenflow_01 as of
 
 # KAIST CS341 SDN Lab Task 2, 3, 4
@@ -52,95 +50,88 @@ import pox.openflow.libopenflow_01 as of
 # If you want, you can define global variables, import libraries, or do others
 ###
 
+
 def init(net) -> None:
-    #
-    # net argument has following structure:
-    # 
-    # net = {
-    #    'hosts': {
-    #         'h1': {
-    #             'name': 'h1',
-    #             'IP': '10.0.0.1',
-    #             'links': [
-    #                 # (node1, port1, node2, port2, link cost)
-    #                 ('h1', 1, 's1', 2, 3)
-    #             ],
-    #         },
-    #         ...
-    #     },
-    #     'switches': {
-    #         's1': {
-    #             'name': 's1',
-    #             'links': [
-    #                 # (node1, port1, node2, port2, link cost)
-    #                 ('s1', 2, 'h1', 1, 3)
-    #             ]
-    #         },
-    #         ...
-    #     }
-    # }
-    #
-    ###
-    G = nx.Graph()
+    # Parse network structure and compute forwarding rules for all switches
+    # This function is called only once during network initialization
 
-    for switch in net['switches']:
-        G.add_node(switch['name'])
+    # Parse network structure
+    switches = net['switches']
+    links = []
+    for switch in switches:
+        links.extend(switch['links'])
 
-    for switch in net['switches']:
-        for link in switch['links']:
-            G.add_edge(switch['name'], link[2], cost=link[4])
+    # Compute forwarding rules using Dijkstra algorithm
+    forwarding_rules = {}  # Dictionary to store forwarding rules for each switch
 
-    forwarding_rules = {}
-    
-    for switch in net['switches']:
-        shortest_paths = nx.shortest_path(G, source=switch['name'], weight='cost')
+    # Define a function to calculate the shortest path using Dijkstra's algorithm
+    def dijkstra(switch_name):
+        # Initialize data structures
+        visited = set()
+        distance = {}
+        previous = {}
+        for switch in switches:
+            distance[switch['name']] = float('inf')
+            previous[switch['name']] = None
 
+        distance[switch_name] = 0
+
+        # Calculate shortest path
+        while len(visited) < len(switches):
+            # Select the switch with the shortest distance
+            current_switch = min((s for s in switches if s['name'] not in visited), key=lambda x: distance[x['name']])
+            visited.add(current_switch['name'])
+
+            # Update distances to neighbors
+            for link in current_switch['links']:
+                neighbor = link[0]
+                cost = link[4]
+                if distance[current_switch['name']] + cost < distance[neighbor]:
+                    distance[neighbor] = distance[current_switch['name']] + cost
+                    previous[neighbor] = current_switch['name']
+
+        # Extract forwarding rules
         rules = {}
-        for destination, path in shortest_paths.items():
-            if destination != switch['name']:
-                next_hop = path[1]
-                out_port = switch['links'][next_hop]['Port']
+        for destination, next_hop in previous.items():
+            if next_hop is not None:
+                out_port = next(link[4] for link in switches[destination]['links'] if link[0] == next_hop)
                 rules[destination] = out_port
 
-        forwarding_rules[switch['name']] = rules
+        return rules
 
+    for switch in switches:
+        switch_name = switch['name']
+        rules = dijkstra(switch_name)
+        forwarding_rules[switch_name] = rules
+
+    # Store the forwarding rules for later use
     net['_forwarding_rules'] = forwarding_rules
-    ###
-    pass
 
 def addrule(switchname: str, connection) -> None:
-    #
-    # This function is invoked when a new switch is connected to controller
-    # Install table entry to the switch's routing table
-    #
-    # For more information about POX openflow API,
-    # Refer to [POX official document](https://noxrepo.github.io/pox-doc/html/),
-    # Especially [ofp_flow_mod - Flow table modification](https://noxrepo.github.io/pox-doc/html/#ofp-flow-mod-flow-table-modification)
-    # and [Match Structure](https://noxrepo.github.io/pox-doc/html/#match-structure)
-    #
-    # your code will be look like:
-    # msg = ....
-    # connection.send(msg)
-    ###
+    # Compute forwarding rules for all switches and push rules to switches
     forwarding_rules = connection.net['_forwarding_rules']
 
-    if swichname in forwarding_rules:
+    if switchname in forwarding_rules:
         rules = forwarding_rules[switchname]
         for destination, out_port in rules.items():
+            # Create flow modification message for ARP packets
+            arp_msg = of.ofp_flow_mod()
+            arp_msg.match.dl_type = 0x0806  # Match ARP packets (EtherType 0x0806)
+            arp_msg.match.nw_dst = destination  # Match the destination IP address
+            arp_msg.actions.append(of.ofp_action_output(port=out_port))  # Set the output port
+            connection.send(arp_msg)  # Send the message to the switch
 
-            msg = of.ofp_flow_mod()
-            msg.match.dl_type = 0x0806
-            msg.match.nw_dst = destination
-            msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
-            connection.send(msg)
+            # Create flow modification message for IPv4 packets
+            ipv4_msg = of.ofp_flow_mod()
+            ipv4_msg.match.dl_type = 0x0800  # Match IPv4 packets (EtherType 0x0800)
+            ipv4_msg.match.nw_dst = destination  # Match the destination IP address
+            ipv4_msg.actions.append(of.ofp_action_output(port=out_port))  # Set the output port
+            connection.send(ipv4_msg)  # Send the message to the switch
 
-            msg = of.ofp_fow_mod()
-            msg.match.dl_type = 0x0800
-            msg.match.nw_dst = destination
-            msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
-            connection.send(msg)
-    ###
+def handlePacket(switchname, event, connection):
+    # This function is not needed for Task 3, so you can leave it empty.
     pass
+
 
 from scapy.all import * # you can use scapy in this task
 
