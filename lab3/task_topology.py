@@ -17,7 +17,15 @@ class Topology(Topo):
         #        The third component represents cost of the link; not used in this task
                 
         ###
-        # YOUR CODE HERE
+        for switch in switches:
+            self.addSwitch(switch)
+
+        for host in hosts:
+            self.addHost(host)
+
+        for link in links:
+            src, dest, _ = link
+            self.addLink(src, dest)
         ###
 
         '''
