@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import pox.openflow.libopenflow_01 as of
-
+from scapy.all import * # you can use scapy in this task
 # KAIST CS341 SDN Lab Task 2, 3, 4
 #
 # All functions in this file runs on the controller:
@@ -53,6 +53,7 @@ import pox.openflow.libopenflow_01 as of
 hosts = {}
 switches = {}
 
+
 def init(net) -> None:
     global hosts, switches
     hosts = net['hosts']
@@ -64,45 +65,23 @@ def init(net) -> None:
 
 def addrule(switchname: str, connection) -> None:
     global hosts, switches
+    flood_ethertypes = [0x0806, 0x0800]
+    msg = of.ofp_flow_mod()
+    msg.match.dl_type = of.OF_DL_TYPE_ETH_TYPE
 
-    if switchname in switches:
+    for ethertype in flood_ethertypes:
+        msg.match.nw_proto = ethertype
+        msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
 
-        # 라우팅 규칙을 계산하고 스위치에 추가하는 로직을 구현합니다.
-        # Dijkstra 알고리즘 또는 다른 라우팅 알고리즘을 사용하여 라우팅 규칙을 계산합니다.
-
-        # 예를 들어, 모든 스위치 간에 연결된 포트로 전송하는 규칙을 설정하는 코드입니다.
-        msg = of.ofp_flow_mod()
-        msg.match = of.ofp_match()  # 모든 패킷과 일치
-        msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))  # 모든 포트로 패킷을 전송
-        connection.send(msg)  
-
+    connection.send(msg) 
 
 def handlePacket(switchname, event, connection):
-    # This function is not needed for Task 3, so you can leave it empty.
-    pass
-
-
-from scapy.all import * # you can use scapy in this task
-
-def handlePacket(switchname, event, connection):
+    global bestport
     packet = event.parsed
     if not packet.parsed:
         print('Ignoring incomplete packet')
         return
-    # Retrieve how packet is parsed
-    # Packet consists of:
-    #  - various protocol headers
-    #  - one content
-    # For example, a DNS over UDP packet consists of following:
-    # [Ethernet Header][           Ethernet Body            ]
-    #                  [IPv4 Header][       IPv4 Body       ]
-    #                               [UDP Header][ UDP Body  ]
-    #                                           [DNS Content]
-    # POX will parse the packet as following:
-    #   ethernet --> ipv4 --> udp --> dns
-    # If POX does not know how to parse content, the content will remain as `bytes`
-    #     Currently, HTTP messages are not parsed, remaining `bytes`. you should parse it manually.
-    # You can find all available packet header and content types from pox/pox/lib/packet/
+
     packetfrags = {}
     p = packet
     while p is not None:
@@ -111,8 +90,3 @@ def handlePacket(switchname, event, connection):
             break
         p = p.next
     print(packet.dump()) # print out unhandled packets
-    # How to know protocol header types? see name of class
-
-    # If you want to send packet back to switch, you can use of.ofp_packet_out() message.
-    # Refer to [ofp_packet_out - Sending packets from the switch](https://noxrepo.github.io/pox-doc/html/#ofp-packet-out-sending-packets-from-the-switch)
-    # You may learn from [l2_learning.py](pox/pox/forwarding/l2_learning.py), which implements learning switches
