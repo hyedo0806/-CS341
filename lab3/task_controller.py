@@ -65,15 +65,15 @@ def init(net) -> None:
 
 def addrule(switchname: str, connection) -> None:
     global hosts, switches
-    flood_ethertypes = [0x0806, 0x0800]
-    msg = of.ofp_flow_mod()
-    msg.match.dl_type = of.OF_DL_TYPE_ETH_TYPE
-
-    for ethertype in flood_ethertypes:
-        msg.match.nw_proto = ethertype
-        msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
+    
+    msg = of.ofp_flow_mod()   
+    msg.match.dl_type = 0x0800
+    msg.match.nw_dst = IPAddr("127.0.0.1")
+    msg.match.tp_dst = 6663
+    msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
 
     connection.send(msg) 
+    print(msg)
 
 def handlePacket(switchname, event, connection):
     global bestport
