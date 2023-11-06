@@ -53,6 +53,7 @@ from scapy.all import * # you can use scapy in this task
 # If you want, you can define global variables, import libraries, or do others
 ###
 
+
 graph = []
 port = []
 hosts = {}
@@ -126,11 +127,8 @@ class Graph():
     return path
 
 
-
-               
-
 def init(net) -> None:
-	global hosts, switches, graph, port
+	global hosts, switches, graph, port, num_hosts, num_switches
 	hosts = net['hosts']
 	switches = net['switches']
 	num_hosts = len(hosts.keys())
@@ -140,49 +138,50 @@ def init(net) -> None:
 	adjacency_matrix = [[0] * (num_hosts + num_switches) for _ in range(num_hosts + num_switches)]
 	port_matrix = [[0] * (num_hosts + num_switches) for _ in range(num_hosts + num_switches)]
 	# 호스트 간 연결 정보 반영
+	
 	for host_name, host_info in hosts.items():
-    		host_index = num_switches + list(hosts.keys()).index(host_name)
-    		for link in host_info['links']:
-        		host_port = link[1]  # 호스트의 포트 번호
-        		switch_name = link[2]
-        		switch_index = list(switches.keys()).index(switch_name)
-        		switch_port = link[3]  # 스위치의 포트 번호
-        		length = link[4]  # 두 노드 사이의 길이
-        		adjacency_matrix[host_index][switch_index] = length
-        		adjacency_matrix[switch_index][host_index] = length
+		host_index = num_switches + list(hosts.keys()).index(host_name)
+		for link in host_info['links']:
+			host_port = link[1]  # 호스트의 포트 번호
+			switch_name = link[2]
+			switch_index = list(switches.keys()).index(switch_name)
+			switch_port = link[3]  # 스위치의 포트 번호
+			length = link[4]  # 두 노드 사이의 길이
+			adjacency_matrix[host_index][switch_index] = length
+			adjacency_matrix[switch_index][host_index] = length
 
-        		port_matrix[host_index][switch_index] = (host_port, switch_port)
-        		port_matrix[switch_index][host_index] = (switch_port, host_port)
+			port_matrix[host_index][switch_index] = (host_port, switch_port)
+			port_matrix[switch_index][host_index] = (switch_port, host_port)
 	
 
 	# 스위치 간 연결 정보 반영
 	for switch_name, switch_info in switches.items():
-    		switch_index = list(switches.keys()).index(switch_name)
-    		for link in switch_info['links']:
-        		if link[2].startswith('h'):
-            			host_port = link[3]  # 호스트의 포트 번호
-            			switch_port = link[1]  # 스위치의 포트 번호
-            			host_name = link[2]
-            			host_index = num_switches + list(hosts.keys()).index(host_name)
-            			length = link[4]  # 두 노드 사이의 길이
-            			adjacency_matrix[switch_index][host_index] = length
-            			adjacency_matrix[host_index][switch_index] = length
-            			port_matrix[switch_index][host_index] = switch_port
-            			port_matrix[host_index][switch_index] = host_port
-        		else:
-            			switch_port = link[1]  # 현재 스위치의 포트 번호
-            			connected_switch_port = link[3]  # 연결된 스위치의 포트 번호
-            			connected_switch_name = link[2]
-            			connected_switch_index = list(switches.keys()).index(connected_switch_name)
-            			length = link[4]  # 두 노드 사이의 길이
-            			adjacency_matrix[switch_index][connected_switch_index] = length
-            			adjacency_matrix[connected_switch_index][switch_index] = length
-            			port_matrix[switch_index][connected_switch_index] = switch_port
-            			port_matrix[connected_switch_index][switch_index] = connected_switch_port
+		switch_index = list(switches.keys()).index(switch_name)
+		for link in switch_info['links']:
+			if link[2].startswith('h'):
+				host_port = link[3]  # 호스트의 포트 번호
+				switch_port = link[1]  # 스위치의 포트 번호
+				host_name = link[2]
+				host_index = num_switches + list(hosts.keys()).index(host_name)
+				length = link[4]  # 두 노드 사이의 길이
+				adjacency_matrix[switch_index][host_index] = length
+				adjacency_matrix[host_index][switch_index] = length
+				port_matrix[switch_index][host_index] = switch_port
+				port_matrix[host_index][switch_index] = host_port
+			else:
+				switch_port = link[1]  # 현재 스위치의 포트 번호
+				connected_switch_port = link[3]  # 연결된 스위치의 포트 번호
+				connected_switch_name = link[2]
+				connected_switch_index = list(switches.keys()).index(connected_switch_name)
+				length = link[4]  # 두 노드 사이의 길이
+				adjacency_matrix[switch_index][connected_switch_index] = length
+				adjacency_matrix[connected_switch_index][switch_index] = length
+				port_matrix[switch_index][connected_switch_index] = switch_port
+				port_matrix[connected_switch_index][switch_index] = connected_switch_port
 
 	# 인접행렬 출력
 	for row in adjacency_matrix:
-    		graph.append(row)
+		graph.append(row)
 
 	for row in port_matrix:
     		port.append(row)
@@ -196,22 +195,24 @@ def addrule(switchname: str, connection) -> None:
 	g.graph = graph
 
 	for s in range(num_switches):
-  		dist = g.dijkstra(s)
-  		for d in range(num_switches,num_switches+num_hosts):
-    			path = g.printShortestPath(dist, s, d)
-   
-    			for p in range(len(path)-1):
-      				out_port = port[path[p]][path[p+1]]	
-	
-				msg = of.ofp_flow_mod()   
-				msg.match.dl_type = 0x800
-				msg.actions.append(of.ofp_action_output(port=out_port))
-				connection.send(msg)
-	
-				msg = of.ofp_flow_mod()   
-				msg.match.dl_type = 0x806
-				msg.actions.append(of.ofp_action_output(port=out_port))
-				connection.send(msg)
+		dist = g.dijkstra(s)
+		for d in range(num_switches,num_switches+num_hosts):
+			path = g.printShortestPath(dist, s, d)
+
+			for p in range(len(path)-1):
+				out_port = port[path[p]][path[p+1]]	
+
+			msg = of.ofp_flow_mod()   
+			msg.match.dl_type = 0x800
+			msg.match.nw_dst = hosts[d]['IP'] 
+			msg.actions.append(of.ofp_action_output(port=out_port))
+			connection.send(msg)
+
+			msg = of.ofp_flow_mod()   
+			msg.match.dl_type = 0x806
+			msg.match.nw_dst = hosts[d]['IP'] 
+			msg.actions.append(of.ofp_action_output(port=out_port))
+			connection.send(msg)
 
 	#msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD)) ## for task2 : flood method
 	
@@ -220,17 +221,17 @@ def addrule(switchname: str, connection) -> None:
 
     
 def handlePacket(switchname, event, connection):
-    global bestport
-    packet = event.parsed
-    if not packet.parsed:
-        print('Ignoring incomplete packet')
-        return
+	global bestport
+	packet = event.parsed
+	if not packet.parsed:
+		print('Ignoring incomplete packet')
+		return
 
-    packetfrags = {}
-    p = packet
-    while p is not None:
-        packetfrags[p.__class__.__name__] = p
-        if isinstance(p, bytes):
-            break
-        p = p.next
-    print(packet.dump()) # print out unhandled packets
+	packetfrags = {}
+	p = packet
+	while p is not None:
+		packetfrags[p.__class__.__name__] = p
+		if isinstance(p, bytes):
+			break
+		p = p.next
+	print(packet.dump()) # print out unhandled packets
