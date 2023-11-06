@@ -203,13 +203,13 @@ def addrule(switchname: str, connection) -> None:
 
 			msg = of.ofp_flow_mod()   
 			msg.match.dl_type = 0x800
-			msg.match.nw_dst = hosts[d]['IP'] 
+			msg.match.nw_dst = hosts['h'+str(d%num_switches+1)]['IP'] 
 			msg.actions.append(of.ofp_action_output(port=out_port))
 			connection.send(msg)
 
 			msg = of.ofp_flow_mod()   
 			msg.match.dl_type = 0x806
-			msg.match.nw_dst = hosts[d]['IP'] 
+			msg.match.nw_dst = hosts['h'+str(d%num_switches+1)]['IP'] 
 			msg.actions.append(of.ofp_action_output(port=out_port))
 			connection.send(msg)
 
