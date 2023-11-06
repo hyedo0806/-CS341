@@ -53,7 +53,6 @@ from scapy.all import * # you can use scapy in this task
 # If you want, you can define global variables, import libraries, or do others
 ###
 
-
 graph = []
 port = []
 hosts = {}
