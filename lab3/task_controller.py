@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 
 import sys
-import pox.openflow.libopenflow_01 as of
-from pox.lib.addresses import IPAddr, IPAddr6, EthAddr
-from scapy.all import * # you can use scapy in this task
+# import pox.openflow.libopenflow_01 as of
+# from pox.lib.addresses import IPAddr, IPAddr6, EthAddr
+# from scapy.all import * # you can use scapy in this task
 
 # KAIST CS341 SDN Lab Task 2, 3, 4
 #
@@ -58,7 +58,6 @@ port = []
 hosts = {}
 switches = {}
 routing_table = {}
-import sys
 
 class Graph():
 
@@ -70,13 +69,13 @@ class Graph():
   def minDistance(self, dist, sptSet):
 
 		# Initilaize minimum distance for next node
-    min = sys.maxsize
+    _min = sys.maxsize
 
 		# Search not nearest vertex not in the
 		# shortest path tree
     for v in range(self.V):
-      if dist[v] < min and sptSet[v] == False:
-        min = dist[v]
+      if dist[v] < _min and sptSet[v] == False:
+        _min = dist[v]
         min_index = v
 
     return min_index
@@ -124,6 +123,25 @@ class Graph():
 
     path.insert(0, src)
     return path
+
+def addrule(switchname, connection) -> None:
+  for (s,d),path in routing_table.items():
+    for idx, p in enumerate(path):
+      if switchname == 's'+str(p): 
+        print(s,',',d)
+        # arp_msg = of.ofp_flow_mod()
+        # arp_msg.match.dl_type = 0x806
+        # arp_msg.actions.append(of.ofp_action_output(port=port[p][path[idx+1]]))
+        # connection.send(arp_msg)
+        
+        # ip_msg = of.ofp_flow_mod() 
+        # ip_msg.match.dl_type = 0x800
+        # ip_msg.match.nw_src = hosts[s]['IP'] 
+        # ip_msg.match.nw_dst = hosts[d]['IP'] 
+        # ip_msg.actions.append(of.ofp_action_output(port=port[p][path[idx+1]]))
+        # connection.send(ip_msg)
+  
+	#msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD)) ## for task2 : flood method
 
 def make_matrix():
   adjacency_matrix = [[0] * (num_hosts + num_switches) for _ in range(num_hosts + num_switches)]
@@ -178,26 +196,7 @@ def make_matrix():
     port.append(row)
 
   return graph, port
-
-def addrule(switchname, connection) -> None:
-  for (s,d),path in routing_table.items():
-    for idx,p in enumerate(path):
-      if switchname == 's'+str(p): 
-        print(s,',',d)
-        arp_msg = of.ofp_flow_mod()
-        arp_msg.match.dl_type = 0x806
-        arp_msg.actions.append(of.ofp_action_output(port=port[p][path[idx+1]]))
-        connection.send(arp_msg)
-        
-        ip_msg = of.ofp_flow_mod() 
-        ip_msg.match.dl_type = 0x800
-        ip_msg.match.nw_src = hosts[s]['IP'] 
-        ip_msg.match.nw_dst = hosts[d]['IP'] 
-        ip_msg.actions.append(of.ofp_action_output(port=port[p][path[idx+1]]))
-        connection.send(ip_msg)
-  
-	#msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD)) ## for task2 : flood method
-
+    
 def init(net):
 
   global num_hosts, num_switches, routing_table, port 
@@ -216,10 +215,8 @@ def init(net):
       
       src = 'h' + str(path[0]%num_switches)
       dst = 'h' + str(path[-1]%num_switches)
-      routing_table[(s,d)] = path
-	
+      routing_table[(s,d)] = path     
 
-    
 def handlePacket(switchname, event, connection):
 	global bestport
 	packet = event.parsed
