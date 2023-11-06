@@ -57,7 +57,7 @@ graph = []
 port = []
 hosts = {}
 switches = {}
-
+routing_table = {}
 import sys
 
 class Graph():
@@ -125,97 +125,98 @@ class Graph():
     path.insert(0, src)
     return path
 
+def make_matrix():
+  adjacency_matrix = [[0] * (num_hosts + num_switches) for _ in range(num_hosts + num_switches)]
+  port_matrix = [[0] * (num_hosts + num_switches) for _ in range(num_hosts + num_switches)]
 
-def init(net) -> None:
-	global hosts, switches, graph, port, num_hosts, num_switches
-	hosts = net['hosts']
-	switches = net['switches']
-	num_hosts = len(hosts.keys())
-	num_switches = len(switches.keys())
-	
-	# 인접행렬 초기화
-	adjacency_matrix = [[0] * (num_hosts + num_switches) for _ in range(num_hosts + num_switches)]
-	port_matrix = [[0] * (num_hosts + num_switches) for _ in range(num_hosts + num_switches)]
-	# 호스트 간 연결 정보 반영
-	
-	for host_name, host_info in hosts.items():
-		host_index = num_switches + list(hosts.keys()).index(host_name)
-		for link in host_info['links']:
-			host_port = link[1]  # 호스트의 포트 번호
-			switch_name = link[2]
-			switch_index = list(switches.keys()).index(switch_name)
-			switch_port = link[3]  # 스위치의 포트 번호
-			length = link[4]  # 두 노드 사이의 길이
-			adjacency_matrix[host_index][switch_index] = length
-			adjacency_matrix[switch_index][host_index] = length
+  for host_name, host_info in hosts.items():
+    host_index = num_switches + list(hosts.keys()).index(host_name)
+    for link in host_info['links']:
+      host_port = link[1]  # 호스트의 포트 번호
+      switch_name = link[2]
+      switch_index = list(switches.keys()).index(switch_name)
+      switch_port = link[3]  # 스위치의 포트 번호
+      length = link[4]  # 두 노드 사이의 길이
+      adjacency_matrix[host_index][switch_index] = length
+      adjacency_matrix[switch_index][host_index] = length
 
-			port_matrix[host_index][switch_index] = (host_port, switch_port)
-			port_matrix[switch_index][host_index] = (switch_port, host_port)
+      port_matrix[host_index][switch_index] = (host_port, switch_port)
+      port_matrix[switch_index][host_index] = (switch_port, host_port)
 	
 
 	# 스위치 간 연결 정보 반영
-	for switch_name, switch_info in switches.items():
-		switch_index = list(switches.keys()).index(switch_name)
-		for link in switch_info['links']:
-			if link[2].startswith('h'):
-				host_port = link[3]  # 호스트의 포트 번호
-				switch_port = link[1]  # 스위치의 포트 번호
-				host_name = link[2]
-				host_index = num_switches + list(hosts.keys()).index(host_name)
-				length = link[4]  # 두 노드 사이의 길이
-				adjacency_matrix[switch_index][host_index] = length
-				adjacency_matrix[host_index][switch_index] = length
-				port_matrix[switch_index][host_index] = switch_port
-				port_matrix[host_index][switch_index] = host_port
-			else:
-				switch_port = link[1]  # 현재 스위치의 포트 번호
-				connected_switch_port = link[3]  # 연결된 스위치의 포트 번호
-				connected_switch_name = link[2]
-				connected_switch_index = list(switches.keys()).index(connected_switch_name)
-				length = link[4]  # 두 노드 사이의 길이
-				adjacency_matrix[switch_index][connected_switch_index] = length
-				adjacency_matrix[connected_switch_index][switch_index] = length
-				port_matrix[switch_index][connected_switch_index] = switch_port
-				port_matrix[connected_switch_index][switch_index] = connected_switch_port
+  for switch_name, switch_info in switches.items():
+    switch_index = list(switches.keys()).index(switch_name)
+    for link in switch_info['links']:
+      if link[2].startswith('h'):
+        host_port = link[3]  # 호스트의 포트 번호
+        switch_port = link[1]  # 스위치의 포트 번호
+        host_name = link[2]
+        host_index = num_switches + list(hosts.keys()).index(host_name)
+        length = link[4]  # 두 노드 사이의 길이
+        adjacency_matrix[switch_index][host_index] = length
+        adjacency_matrix[host_index][switch_index] = length
+        port_matrix[switch_index][host_index] = switch_port
+        port_matrix[host_index][switch_index] = host_port
+      else:
+        switch_port = link[1]  # 현재 스위치의 포트 번호
+        connected_switch_port = link[3]  # 연결된 스위치의 포트 번호
+        connected_switch_name = link[2]
+        connected_switch_index = list(switches.keys()).index(connected_switch_name)
+        length = link[4]  # 두 노드 사이의 길이
+        adjacency_matrix[switch_index][connected_switch_index] = length
+        adjacency_matrix[connected_switch_index][switch_index] = length
+        port_matrix[switch_index][connected_switch_index] = switch_port
+        port_matrix[connected_switch_index][switch_index] = connected_switch_port
 
+  graph, port = [], []
 	# 인접행렬 출력
-	for row in adjacency_matrix:
-		graph.append(row)
+  for row in adjacency_matrix:
+    graph.append(row)
 
-	for row in port_matrix:
-    		port.append(row)
-	
-	
-	    
+  for row in port_matrix:
+    port.append(row)
 
-def addrule(switchname: str, connection) -> None:
+  return graph, port
 
-	g = Graph(8)
-	g.graph = graph
-
-	for s in range(num_switches):
-		dist = g.dijkstra(s)
-		for d in range(num_switches,num_switches+num_hosts):
-			path = g.printShortestPath(dist, s, d)
-
-			for p in range(len(path)-1):
-				out_port = port[path[p]][path[p+1]]	
-
-			msg = of.ofp_flow_mod()   
-			msg.match.dl_type = 0x800
-			msg.match.nw_dst = hosts['h'+str(d%num_switches+1)]['IP'] 
-			msg.actions.append(of.ofp_action_output(port=out_port))
-			connection.send(msg)
-
-			msg = of.ofp_flow_mod()   
-			msg.match.dl_type = 0x806
-			msg.match.nw_dst = hosts['h'+str(d%num_switches+1)]['IP'] 
-			msg.actions.append(of.ofp_action_output(port=out_port))
-			connection.send(msg)
-
+def addrule(switchname, connection) -> None:
+  for (s,d),path in routing_table.items():
+    for idx,p in enumerate(path):
+      if switchname == 's'+str(p): 
+        print(s,',',d)
+        arp_msg = of.ofp_flow_mod()
+        arp_msg.match.dl_type = 0x806
+        arp_msg.actions.append(of.ofp_action_output(port=port[p][path[idx+1]]))
+        connection.send(arp_msg)
+        
+        ip_msg = of.ofp_flow_mod() 
+        ip_msg.match.dl_type = 0x800
+        ip_msg.match.nw_src = hosts[s]['IP'] 
+        ip_msg.match.nw_dst = hosts[d]['IP'] 
+        ip_msg.actions.append(of.ofp_action_output(port=port[p][path[idx+1]]))
+        connection.send(ip_msg)
+  
 	#msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD)) ## for task2 : flood method
-	
-	
+
+def init(net):
+
+  global num_hosts, num_switches, routing_table, port 
+  num_hosts = len(hosts.keys())
+  num_switches = len(switches.keys())
+  graph, port = make_matrix()
+
+  G = Graph(num_hosts+num_switches)
+  G.graph = graph
+
+  for s in range(num_hosts):
+    dist = G.dijkstra(s+num_switches)
+    for d in range(num_hosts):
+      if s == d : continue
+      path = G.printShortestPath(dist, s+num_switches, d+num_switches)
+      
+      src = 'h' + str(path[0]%num_switches)
+      dst = 'h' + str(path[-1]%num_switches)
+      routing_table[(s,d)] = path
 	
 
     
