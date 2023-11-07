@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 
 import sys
-# import pox.openflow.libopenflow_01 as of
-# from pox.lib.addresses import IPAddr, IPAddr6, EthAddr
-# from scapy.all import * # you can use scapy in this task
+import pox.openflow.libopenflow_01 as of
+from pox.lib.addresses import IPAddr, IPAddr6, EthAddr
+from scapy.all import * # you can use scapy in this task
 
 # KAIST CS341 SDN Lab Task 2, 3, 4
 #
@@ -54,10 +54,12 @@ import sys
 ###
 
 graph = []
-port = []
+cost = {}
+port = {}
 hosts = {}
 switches = {}
 routing_table = {}
+port
 
 class Graph():
 
@@ -83,7 +85,7 @@ class Graph():
 	# Funtion that implements Dijkstra's single source
 	# shortest path algorithm for a graph represented
 	# using adjacency matrix representation
-  def dijkstra(self, src):
+  def dijkstra(self, src: int):
 
     dist = [sys.maxsize] * self.V
     dist[src] = 0
@@ -121,101 +123,106 @@ class Graph():
       path.insert(0, at)
       at = self.parent[at]
 
-    path.insert(0, src)
+    print("path : ", path)
+    path = ['s'+str(p+1) for p in path[:-1]]
+    path.insert(0,'h'+str(src%num_switches + 1))
+    path.append('h'+str(dest%num_switches + 1))
+    print(dest)
+    
     return path
 
 def addrule(switchname, connection) -> None:
-  for (s,d),path in routing_table.items():
-    for idx, p in enumerate(path):
-      if switchname == 's'+str(p): 
-        print(s,',',d)
-        # arp_msg = of.ofp_flow_mod()
-        # arp_msg.match.dl_type = 0x806
-        # arp_msg.actions.append(of.ofp_action_output(port=port[p][path[idx+1]]))
-        # connection.send(arp_msg)
-        
-        # ip_msg = of.ofp_flow_mod() 
-        # ip_msg.match.dl_type = 0x800
-        # ip_msg.match.nw_src = hosts[s]['IP'] 
-        # ip_msg.match.nw_dst = hosts[d]['IP'] 
-        # ip_msg.actions.append(of.ofp_action_output(port=port[p][path[idx+1]]))
-        # connection.send(ip_msg)
+  print(switchname)
+  print("addrule : ", port)
   
-	#msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD)) ## for task2 : flood method
+  
+  for (s,d),path in routing_table.items():
 
-def make_matrix():
-  adjacency_matrix = [[0] * (num_hosts + num_switches) for _ in range(num_hosts + num_switches)]
-  port_matrix = [[0] * (num_hosts + num_switches) for _ in range(num_hosts + num_switches)]
+  
+    for idx,p in enumerate(path[1:-1]):
+    
+      if switchname == p:  
+      
+        in_port = port[(path[idx], path[idx+1])][1]
+        out_port = port[(path[idx+1], path[idx+2])][0]
 
-  for host_name, host_info in hosts.items():
-    host_index = num_switches + list(hosts.keys()).index(host_name)
-    for link in host_info['links']:
-      host_port = link[1]  # 호스트의 포트 번호
-      switch_name = link[2]
-      switch_index = list(switches.keys()).index(switch_name)
-      switch_port = link[3]  # 스위치의 포트 번호
-      length = link[4]  # 두 노드 사이의 길이
-      adjacency_matrix[host_index][switch_index] = length
-      adjacency_matrix[switch_index][host_index] = length
+        print(p,':', in_port,',',out_port)
+        arp_msg = of.ofp_flow_mod(command=of.OFPFC_ADD)
+        arp_msg.match = of.ofp_match()
+        arp_msg.match.dl_type = 0x0806
+        arp_msg.match.in_port = in_port
+        arp_msg.actions.append(of.ofp_action_output(port=out_port))
+        connection.send(arp_msg)
+        
+        ip_msg = of.ofp_flow_mod(command=of.OFPFC_ADD) 
+        ip_msg.match = of.ofp_match()
+        ip_msg.match.dl_type = 0x0800
+        ip_msg.match.in_port = in_port
+        print('h'+str(s+1),': ',hosts['h'+str(s+1)]['IP'])
+        print('h'+str(d+1),':', hosts['h'+str(d+1)]['IP'])
+        ip_msg.match.nw_src = IPAddr(hosts['h'+str(s+1)]['IP'])
+        ip_msg.match.nw_dst = IPAddr(hosts['h'+str(d+1)]['IP']) 
+        ip_msg.actions.append(of.ofp_action_output(port=out_port))
+        connection.send(ip_msg)
+        
 
-      port_matrix[host_index][switch_index] = (host_port, switch_port)
-      port_matrix[switch_index][host_index] = (switch_port, host_port)
+        
+  
 	
 
-	# 스위치 간 연결 정보 반영
-  for switch_name, switch_info in switches.items():
-    switch_index = list(switches.keys()).index(switch_name)
-    for link in switch_info['links']:
-      if link[2].startswith('h'):
-        host_port = link[3]  # 호스트의 포트 번호
-        switch_port = link[1]  # 스위치의 포트 번호
-        host_name = link[2]
-        host_index = num_switches + list(hosts.keys()).index(host_name)
-        length = link[4]  # 두 노드 사이의 길이
-        adjacency_matrix[switch_index][host_index] = length
-        adjacency_matrix[host_index][switch_index] = length
-        port_matrix[switch_index][host_index] = switch_port
-        port_matrix[host_index][switch_index] = host_port
-      else:
-        switch_port = link[1]  # 현재 스위치의 포트 번호
-        connected_switch_port = link[3]  # 연결된 스위치의 포트 번호
-        connected_switch_name = link[2]
-        connected_switch_index = list(switches.keys()).index(connected_switch_name)
-        length = link[4]  # 두 노드 사이의 길이
-        adjacency_matrix[switch_index][connected_switch_index] = length
-        adjacency_matrix[connected_switch_index][switch_index] = length
-        port_matrix[switch_index][connected_switch_index] = switch_port
-        port_matrix[connected_switch_index][switch_index] = connected_switch_port
+ 
 
-  graph, port = [], []
-	# 인접행렬 출력
-  for row in adjacency_matrix:
-    graph.append(row)
+def make_matrix():
 
-  for row in port_matrix:
-    port.append(row)
+  global graph, port, cost
+  vertex = list(hosts.keys()|switches.keys())
 
-  return graph, port
+  for key, value in hosts.items():
+    for l in value['links']:
+      port[(l[0], l[2])] = (l[1], l[3])
+      cost[(l[0], l[2])] = l[4]
+
+  for key, value in switches.items():
+    for l in value['links']:
+      port[(l[0], l[2])] = (l[1], l[3])
+      cost[(l[0], l[2])] = l[4]
+      
+  graph = [[0]*len(vertex) for _ in range(len(vertex))]
+  for i,v1 in enumerate(vertex):
+    for j,v2 in enumerate(vertex):
+      if v1==v2: continue
+      if (v1, v2) in port.keys(): 
+        graph[i][j] = cost[(v1, v2)]
+        
+      
+      
+
     
 def init(net):
 
-  global num_hosts, num_switches, routing_table, port 
+  global num_hosts, num_switches, routing_table, hosts, switches
+  print("net : ",net) 
+  hosts = net['hosts']
+  switches = net['switches']
   num_hosts = len(hosts.keys())
   num_switches = len(switches.keys())
-  graph, port = make_matrix()
-
+  make_matrix()
+  
   G = Graph(num_hosts+num_switches)
   G.graph = graph
+  
+  print("graph : ", graph)
+  print("port : ", port)
 
   for s in range(num_hosts):
     dist = G.dijkstra(s+num_switches)
     for d in range(num_hosts):
       if s == d : continue
+      print(s,'->',d)
       path = G.printShortestPath(dist, s+num_switches, d+num_switches)
       
-      src = 'h' + str(path[0]%num_switches)
-      dst = 'h' + str(path[-1]%num_switches)
-      routing_table[(s,d)] = path     
+      routing_table[(s,d)] = path  
+  print("routing table : ", routing_table)
 
 def handlePacket(switchname, event, connection):
 	global bestport
@@ -231,4 +238,5 @@ def handlePacket(switchname, event, connection):
 		if isinstance(p, bytes):
 			break
 		p = p.next
+	#print("packet : ", packet.__dict__)
 	print(packet.dump()) # print out unhandled packets

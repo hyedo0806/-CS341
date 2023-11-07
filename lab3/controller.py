@@ -42,6 +42,7 @@ class CS341Controller(object):
         if switchcnt == 0:
             # This is the first switch
             self.routeinit()
+        
         switchname = str(event.connection.ports[65534]).split(':',2)[0]
         task_controller.addrule(switchname, event.connection)
         switchcnt += 1
