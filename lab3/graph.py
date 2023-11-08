@@ -14,7 +14,7 @@ def gen_graph(task=1):
 
     if task in range(1,4): # For task 1, 2, 3
         # increase number of switches and hosts to make more complex and bigger network
-        switch=5
+        switch=1
         host=3
         
         switches = ['s{}'.format(i) for i in range(1, 1+switch)]

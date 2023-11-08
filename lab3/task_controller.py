@@ -63,47 +63,57 @@ class Graph():
       at = self.parent[at]
     path.insert(0, src)
     print("path :::", path)
-    path[0] = 'h'+str(path[0]%len(switches.keys())+1)
-    path[-1]='h'+str(path[-1]%len(switches.keys())+1)
     
+    path[0] = 'h'+str(path[0]-len(switches.keys()) + 1)
+    print(path)
+    path[-1]='h'+str(path[-1]-len(switches.keys()) + 1)
+    print(path)
     for p in range(1,len(path)-1): path[p] = 's'+str(path[p]+1)
 
     print("path :::", path)
     return path
 
 def addrule(switchname, connection) -> None:
-  print(switchname)
-  print("addrule : ", port)
-  
   for (s,d),path in routing_table.items():
 
-    print('h'+str(s+1),': ',hosts['h'+str(s+1)]['IP'])
-    print('h'+str(d+1),':', hosts['h'+str(d+1)]['IP'])
     for idx,p in enumerate(path[1:-1]):
-      print(path)
-      print(switchname, ',', p)
+
       if switchname == p:  
-        print("loop")
+
         
         in_port = port[(path[idx], path[idx+1])][1]
         out_port = port[(path[idx+1], path[idx+2])][0]
 
-        print(p,':', in_port,',',out_port)
-        arp_msg = of.ofp_flow_mod()
+        print(p ,' ::','h'+str(s+1),'->','h'+str(d+1),': (', in_port,',',out_port,')')
+        arp_msg = of.ofp_flow_mod() 
         arp_msg.match = of.ofp_match()
+
         arp_msg.match.dl_type = 0x0806
         arp_msg.match.in_port = in_port
+        arp_msg.priority = 100
         arp_msg.actions.append(of.ofp_action_output(port=out_port))
         connection.send(arp_msg)
+        print(arp_msg)
         
         ip_msg = of.ofp_flow_mod() 
         ip_msg.match = of.ofp_match()
+
         ip_msg.match.dl_type = 0x0800
         ip_msg.match.in_port = in_port
+        ip_msg.priority = 200
         ip_msg.match.nw_src = IPAddr(hosts['h'+str(s+1)]['IP'])
         ip_msg.match.nw_dst = IPAddr(hosts['h'+str(d+1)]['IP']) 
         ip_msg.actions.append(of.ofp_action_output(port=out_port))
         connection.send(ip_msg)
+        print(ip_msg)
+        
+        msg = of.ofp_barrier_request()
+        connection.send(msg)
+
+        
+        
+        
+        
         
 
 def make_matrix():
@@ -136,11 +146,13 @@ def make_matrix():
 def init(net):
 
   global num_hosts, num_switches, routing_table, hosts, switches
+  
   print("net : ",net) 
   hosts = net['hosts']
   switches = net['switches']
   num_hosts = len(hosts.keys())
   num_switches = len(switches.keys())
+  
   make_matrix()
   
   G = Graph(num_hosts+num_switches)
