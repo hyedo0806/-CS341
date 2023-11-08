@@ -89,7 +89,7 @@ def addrule(switchname, connection) -> None:
         arp_msg.match = of.ofp_match()
 
         arp_msg.match.dl_type = 0x0806
-        arp_msg.match.in_port = in_port
+        #arp_msg.match.in_port = in_port
         arp_msg.priority = 100
         arp_msg.actions.append(of.ofp_action_output(port=out_port))
         connection.send(arp_msg)
@@ -99,7 +99,7 @@ def addrule(switchname, connection) -> None:
         ip_msg.match = of.ofp_match()
 
         ip_msg.match.dl_type = 0x0800
-        ip_msg.match.in_port = in_port
+        #ip_msg.match.in_port = in_port
         ip_msg.priority = 200
         ip_msg.match.nw_src = IPAddr(hosts['h'+str(s+1)]['IP'])
         ip_msg.match.nw_dst = IPAddr(hosts['h'+str(d+1)]['IP']) 
@@ -172,18 +172,23 @@ def init(net):
   print("routing table : ", routing_table)
 
 def handlePacket(switchname, event, connection):
-	global bestport
-	packet = event.parsed
-	if not packet.parsed:
-		print('Ignoring incomplete packet')
-		return
+  global bestport
+  packet = event.parsed
+  if not packet.parsed:
+    print('Ignoring incomplete packet')
+    return
 
-	packetfrags = {}
-	p = packet
-	while p is not None:
-		packetfrags[p.__class__.__name__] = p
-		if isinstance(p, bytes):
-			break
-		p = p.next
-	#print("packet : ", packet.__dict__)
-	print(packet.dump()) # print out unhandled packets
+  packetfrags = {}
+  p = packet
+  while p is not None:
+    packetfrags[p.__class__.__name__] = p
+    if isinstance(p, bytes):break
+    p = p.next
+  data = event.data
+  print(switchname, "_"*100)
+
+  hexdump(data)
+  ether = Ether(data)
+  print(ether.show())
+  #print("packet : ", packet.__dict__)
+  print(packet.dump()) # print out unhandled packets
